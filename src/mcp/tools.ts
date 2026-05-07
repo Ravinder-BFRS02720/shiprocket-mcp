@@ -19,6 +19,7 @@ export const initializeTools = (server: McpServer) => {
     {
       delivery_pincode: zod.string(),
     },
+    { title: "Estimated Delivery Date", readOnlyHint: true, destructiveHint: false },
     async ({ delivery_pincode: deliveryPincode }, context) => {
       const { sellerToken } =
         connectionsBySessionId[context.sessionId ?? globalSessionId];
@@ -109,6 +110,7 @@ export const initializeTools = (server: McpServer) => {
     {
       awb_number: zod.string(),
     },
+    { title: "Track Order", readOnlyHint: true, destructiveHint: false },
     async ({ awb_number: awbNumber }, context) => {
       const { sellerToken } =
         connectionsBySessionId[context.sessionId ?? globalSessionId];
@@ -210,6 +212,7 @@ export const initializeTools = (server: McpServer) => {
         )
         .optional(),
     },
+    { title: "List Orders", readOnlyHint: true, destructiveHint: false },
     async ({ status }, context) => {
       let concatenatedStatusIds = "";
 
@@ -352,6 +355,7 @@ export const initializeTools = (server: McpServer) => {
       weight_in_kg: zod.number(),
       cod_or_prepaid: zod.string(zod.enum(["COD", "PREPAID"])),
     },
+    { title: "Shipping Rate Calculator", readOnlyHint: true, destructiveHint: false },
     async (
       {
         pickup_postcode: pickupPincode,
@@ -442,6 +446,7 @@ export const initializeTools = (server: McpServer) => {
       order_id: zod.string().min(1),
       courier_id: zod.number().optional(),
     },
+    { title: "Ship Order", readOnlyHint: false, destructiveHint: true },
     async ({ order_id: orderId, courier_id: courierId }, context) => {
       orderId = orderId.trim();
       const { sellerToken } =
@@ -524,6 +529,7 @@ export const initializeTools = (server: McpServer) => {
       order_id: zod.string().min(1),
       pickup_date: zod.string(),
     },
+    { title: "Schedule Order Pickup", readOnlyHint: false, destructiveHint: true },
     async ({ order_id: orderId, pickup_date: pickupDate }, context) => {
       orderId = orderId.trim();
       const { sellerToken } =
@@ -604,6 +610,7 @@ export const initializeTools = (server: McpServer) => {
       order_id: zod.number(),
       cancel_on_channel: zod.boolean().default(true),
     },
+    { title: "Cancel Order", readOnlyHint: false, destructiveHint: true },
     async (
       { order_id: orderId, cancel_on_channel: cancelOnChannel },
       context
@@ -723,6 +730,7 @@ export const initializeTools = (server: McpServer) => {
         })
       ),
     },
+    { title: "Create Order", readOnlyHint: false, destructiveHint: true },
     async (args, context) => {
       const { sellerToken } =
         connectionsBySessionId[context.sessionId ?? globalSessionId];
@@ -826,7 +834,8 @@ export const initializeTools = (server: McpServer) => {
         country: String representing pickup address country
         pincode: 6-digit number representing pickup address pincode`,
     {},
-    async (args, context) => {
+    { title: "List Pickup Addresses", readOnlyHint: true, destructiveHint: false },
+    async (_args, context) => {
       const { sellerToken } =
         connectionsBySessionId[context.sessionId ?? globalSessionId];
       const url = `${API_DOMAINS.SHIPROCKET}/v1/external/settings/company/pickup?medium=shiprocketMCP`;
@@ -902,6 +911,7 @@ export const initializeTools = (server: McpServer) => {
     Returns:
         file_url: String representing URL of generated label`,
     { shipment_id: zod.number() },
+    { title: "Generate Shipment Label", readOnlyHint: true, destructiveHint: false },
     async ({ shipment_id: shipmentId }, context) => {
       const { sellerToken } =
         connectionsBySessionId[context.sessionId ?? globalSessionId];
@@ -910,10 +920,7 @@ export const initializeTools = (server: McpServer) => {
       const data = (
         await axios.post(
           url,
-          {
-            shipment_id: [shipmentId],
-            medium: "shiprocketMCP",
-          },
+          { shipment_id: shipmentId },
           {
             headers: {
               Authorization: `Bearer ${sellerToken}`,
@@ -932,7 +939,7 @@ export const initializeTools = (server: McpServer) => {
             }),
           },
         ],
-      };
+      }
     }
   );
 };

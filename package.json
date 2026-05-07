@@ -5,9 +5,12 @@
   "mcpName": "io.github.bfrs/shiprocket-mcp",
   "scripts": {
     "dev": "ts-node-dev -r tsconfig-paths/register src/main.ts --watch",
+    "dev:http": "MCP_TRANSPORT=HTTP ts-node-dev -r tsconfig-paths/register src/main.ts --watch",
     "build": "tsc",
     "start": "node -r tsconfig-paths/register dist/main.js",
-    "inspector": "npx @modelcontextprotocol/inspector node dist/main.js"
+    "start:http": "MCP_TRANSPORT=HTTP node -r tsconfig-paths/register dist/main.js",
+    "inspector": "npx @modelcontextprotocol/inspector node -r tsconfig-paths/register dist/main.js",
+    "inspector:http": "npx @modelcontextprotocol/inspector"
   },
   "keywords": [],
   "author": "",
