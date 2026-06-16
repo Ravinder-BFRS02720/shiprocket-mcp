@@ -1,9 +1,35 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z as zod } from "zod";
 import axios from "axios";
-import { connectionsBySessionId, globalSessionId } from "./connections";
+import { connectionsBySessionId, globalSessionId, expiredSellerTokenSessions } from "./connections";
 import { AxiosError } from "axios";
 import { API_DOMAINS } from "@/config";
+
+const issuerBase = () =>
+  process.env.OAUTH_ISSUER ?? `http://localhost:${process.env.APP_PORT ?? "3000"}`;
+
+// Called when Shiprocket returns 401.
+// Marks the session so the next POST/GET /mcp request revokes MCP tokens and returns 401,
+// triggering a full OAuth re-auth (login form) in both Claude and ChatGPT.
+// Also returns _meta["mcp/www_authenticate"] which ChatGPT renders as an inline re-auth button.
+function shiprocketAuthError(sessionId: string) {
+  expiredSellerTokenSessions.add(sessionId);
+  const base = issuerBase();
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: "Your Shiprocket session has expired. Please reconnect: Settings → Integrations → Shiprocket → Disconnect → Reconnect.",
+      },
+    ],
+    _meta: {
+      "mcp/www_authenticate": [
+        `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource", error="invalid_token", error_description="Shiprocket session expired, please reconnect"`,
+      ],
+    },
+    isError: true,
+  };
+}
 
 export const initializeTools = (server: McpServer) => {
   server.tool(
@@ -26,27 +52,19 @@ export const initializeTools = (server: McpServer) => {
 
       const listAddressUrl = `${API_DOMAINS.SHIPROCKET}/v1/external/settings/company/pickup?limit=1&medium=shiprocketMCP`;
 
-      const addressList = (
-        await axios.get(listAddressUrl, {
-          headers: {
-            Authorization: `Bearer ${sellerToken}`,
-            "Content-Type": "application/json",
-          },
-        })
-      ).data;
-
-      const pickupPostcode =
-        addressList?.data?.shipping_address?.[0]?.pin_code ?? "110092";
-
-      const serviceabilityUrl = `${API_DOMAINS.SERVICEABILITY}/courier/ratingserviceability?pickup_postcode=${pickupPostcode}&delivery_postcode=${deliveryPincode}&weight=0.5&cod=0&medium=shiprocketMCP`;
-
       try {
+        const addressList = (
+          await axios.get(listAddressUrl, {
+            headers: { Authorization: `Bearer ${sellerToken}`, "Content-Type": "application/json" },
+          })
+        ).data;
+
+        const pickupPostcode = addressList?.data?.shipping_address?.[0]?.pin_code ?? "110092";
+        const serviceabilityUrl = `${API_DOMAINS.SERVICEABILITY}/courier/ratingserviceability?pickup_postcode=${pickupPostcode}&delivery_postcode=${deliveryPincode}&weight=0.5&cod=0&medium=shiprocketMCP`;
+
         const serviceabilityData = (
           await axios.get(serviceabilityUrl, {
-            headers: {
-              Authorization: `Bearer ${sellerToken}`,
-              "Content-Type": "application/json",
-            },
+            headers: { Authorization: `Bearer ${sellerToken}`, "Content-Type": "application/json" },
           })
         ).data;
 
@@ -55,39 +73,26 @@ export const initializeTools = (server: McpServer) => {
             {
               type: "text",
               text: JSON.stringify({
-                estimated_delivery_date:
-                  serviceabilityData.data.available_courier_companies[0].etd,
+                estimated_delivery_date: serviceabilityData.data.available_courier_companies[0].etd,
                 delivery_pincode: deliveryPincode,
               }),
             },
           ],
         };
       } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
         if (err instanceof AxiosError) {
           console.error(err.response?.data);
-
           return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  success: false,
-                  error: err.response?.data,
-                }),
-              },
-            ],
+            content: [{ type: "text", text: JSON.stringify({ success: false, error: err.response?.data }) }],
           };
         } else if (err instanceof Error) {
           console.error(err.stack);
         }
-
         return {
-          content: [
-            {
-              type: "text",
-              text: `Unable to fetch expected date of delivery due to some error`,
-            },
-          ],
+          content: [{ type: "text", text: `Unable to fetch expected date of delivery due to some error` }],
         };
       }
     }
@@ -159,6 +164,9 @@ export const initializeTools = (server: McpServer) => {
           ],
         };
       } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
         if (err instanceof AxiosError) {
           console.error(err.response?.data);
 
@@ -299,6 +307,9 @@ export const initializeTools = (server: McpServer) => {
           ],
         };
       } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
         if (err instanceof AxiosError) {
           console.error(err.response?.data);
 
@@ -403,6 +414,9 @@ export const initializeTools = (server: McpServer) => {
           ],
         };
       } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
         if (err instanceof AxiosError) {
           console.error(err.response?.data);
 
@@ -483,6 +497,9 @@ export const initializeTools = (server: McpServer) => {
           ],
         };
       } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
         if (err instanceof AxiosError) {
           console.error(err.response?.data);
 
@@ -564,6 +581,9 @@ export const initializeTools = (server: McpServer) => {
           ],
         };
       } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
         if (err instanceof AxiosError) {
           console.error(err.response?.data);
 
@@ -647,6 +667,9 @@ export const initializeTools = (server: McpServer) => {
           ],
         };
       } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
         if (err instanceof AxiosError) {
           console.error(err.response?.data);
 
@@ -746,7 +769,8 @@ export const initializeTools = (server: McpServer) => {
                 .padStart(4)}`,
               order_date: new Date().toLocaleDateString("en-CA"),
               pickup_location: args.pickup_location,
-              billing_customer_name: args.customer_name,
+              billing_customer_name: args.customer_name.split(" ")[0],
+              billing_last_name: args.customer_name.split(" ").slice(1).join(" ") || "",
               billing_address: args.delivery_address,
               billing_city: args.delivery_city,
               billing_pincode: args.delivery_pincode,
@@ -776,6 +800,12 @@ export const initializeTools = (server: McpServer) => {
           )
         ).data;
 
+        if (!data.order_id) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ success: false, error: data.message ?? "Order creation failed" }) }],
+          };
+        }
+
         return {
           content: [
             {
@@ -788,6 +818,9 @@ export const initializeTools = (server: McpServer) => {
           ],
         };
       } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
         if (err instanceof AxiosError) {
           console.error(err.response?.data);
 
@@ -871,6 +904,9 @@ export const initializeTools = (server: McpServer) => {
           ],
         };
       } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
         if (err instanceof AxiosError) {
           console.error(err.response?.data);
 
@@ -917,28 +953,44 @@ export const initializeTools = (server: McpServer) => {
         connectionsBySessionId[context.sessionId ?? globalSessionId];
 
       const url = `${API_DOMAINS.SHIPROCKET}/v1/external/courier/generate/label`;
-      const data = (
-        await axios.post(
-          url,
-          { shipment_id: shipmentId },
-          {
-            headers: {
-              Authorization: `Bearer ${sellerToken}`,
-              "Content-Type": "application/json",
-            },
-          }
-        )
-      ).data;
+      try {
+        const data = (
+          await axios.post(
+            url,
+            { shipment_id: shipmentId },
+            {
+              headers: {
+                Authorization: `Bearer ${sellerToken}`,
+                "Content-Type": "application/json",
+              },
+            }
+          )
+        ).data;
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              file_url: data.label_url,
-            }),
-          },
-        ],
+        if (!data.label_created || !data.label_url) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ success: false, error: data.response ?? "Label generation failed. Ensure the shipment has an AWB assigned." }) }],
+          };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify({ file_url: data.label_url }) }],
+        };
+      } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          return shiprocketAuthError(context.sessionId ?? globalSessionId);
+        }
+        if (err instanceof AxiosError) {
+          console.error(err.response?.data);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ success: false, error: err.response?.data }) }],
+          };
+        } else if (err instanceof Error) {
+          console.error(err.stack);
+        }
+        return {
+          content: [{ type: "text", text: JSON.stringify({ success: false, message: "Unable to generate label" }) }],
+        };
       }
     }
   );

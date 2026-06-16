@@ -1,0 +1,43 @@
+services:
+  mcp:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      MCP_TRANSPORT: HTTP
+      APP_PORT: "3000"
+      # Required in production — set to your public domain
+      OAUTH_ISSUER: ${OAUTH_ISSUER}
+      # Redis connection
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Set REDIS_PASSWORD if you enable requirepass in redis.conf
+      # REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - mcp-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - mcp-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:
+
+networks:
+  mcp-net:
+    driver: bridge

@@ -8,7 +8,12 @@ export const connectionsBySessionId: Record<
   {
     transport: SSEServerTransport | StdioServerTransport | StreamableHTTPServerTransport;
     sellerToken: string;
+    accessToken?: string; // MCP bearer token — stored so tools can revoke it on SR 401
   }
 > = {};
 
 export const globalSessionId = crypto.randomUUID();
+
+// Sessions where Shiprocket returned 401 — MCP tokens are revoked on the next HTTP request
+// to force a full OAuth re-auth (login form) rather than a silent token refresh
+export const expiredSellerTokenSessions = new Set<string>();
